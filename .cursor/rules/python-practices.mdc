@@ -1,0 +1,24 @@
+---
+description: Python best practices and DRY—reuse before duplicating
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Python practices and reuse
+
+## Best practices
+
+- Prefer small, single-purpose functions and explicit names; keep modules focused.
+- Match existing patterns in the repo (imports, typing style, error handling, logging).
+- Use typed signatures and structured data (`TypedDict`, dataclasses, or Pydantic) consistently with the rest of the project.
+- Put configuration in settings/env; avoid hardcoding secrets or magic strings that already exist as constants elsewhere.
+
+## Do not duplicate—reuse first
+
+- Before adding logic, search the codebase for similar behavior (same parsing, HTTP calls, path handling, CLI patterns, etc.).
+- Prefer extending an existing function or module over copying blocks; extract shared helpers when two call sites need the same steps.
+- If duplication is only avoidable with heavy abstraction, prefer one clear shared helper over two slightly divergent copies—then unify call sites.
+
+## When touching tests
+
+- Reuse fixtures and helpers under `tests/`; do not copy large setup blocks across files without extracting a shared fixture or utility.
