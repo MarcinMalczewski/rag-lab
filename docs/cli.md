@@ -2,7 +2,8 @@
 
 The CLI operates on a small set of setups and ingestion templates predefined in
 code. A setup fixes chunking, embedding, retrieval, and Qdrant indexing choices;
-a template converts one input format into normalized documents.
+a template converts one input format into normalized documents. Currently,
+`raglab setups` is implemented; the remaining commands are CLI placeholders.
 
 ```bash
 raglab setups
