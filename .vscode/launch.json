@@ -1,0 +1,100 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "raglab: ingest sample (naive-100-0)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "rag_lab.cli",
+      "args": [
+        "ingest",
+        "data/sample/documents.jsonl",
+        "--template",
+        "jsonl-documents",
+        "--setup",
+        "naive-100-0"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "raglab: ingest sample (naive-500-100)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "rag_lab.cli",
+      "args": [
+        "ingest",
+        "data/sample/documents.jsonl",
+        "--template",
+        "jsonl-documents",
+        "--setup",
+        "naive-500-100"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "raglab: query",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "rag_lab.cli",
+      "args": ["query", "${input:question}", "--setup", "${input:setup}"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "raglab: setups / templates / status",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "rag_lab.cli",
+      "args": ["${input:simpleCommand}"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}/src" },
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "pytest: current file",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["${file}", "-s"],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ],
+  "inputs": [
+    {
+      "id": "question",
+      "type": "promptString",
+      "description": "Query text",
+      "default": "What is late chunking?"
+    },
+    {
+      "id": "setup",
+      "type": "pickString",
+      "description": "Setup ID",
+      "options": ["naive-100-0", "naive-500-100", "late-chunking-v1"],
+      "default": "naive-500-100"
+    },
+    {
+      "id": "simpleCommand",
+      "type": "pickString",
+      "description": "Command",
+      "options": ["setups", "templates", "status"],
+      "default": "setups"
+    }
+  ]
+}
