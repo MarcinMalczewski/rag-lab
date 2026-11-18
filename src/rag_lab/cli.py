@@ -2,13 +2,33 @@
 
 import argparse
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
 from rag_lab.setups import get_setup, list_setups
+from rag_lab.templates import get_template, list_templates, source_checksum
 
 
 def _print_setups(_: argparse.Namespace) -> int:
     for setup in list_setups():
         print(f"{setup.id}: {setup.description}")
+    return 0
+
+
+def _print_templates(_: argparse.Namespace) -> int:
+    for template in list_templates():
+        print(f"{template.id}: {template.description}")
+    return 0
+
+
+def _ingest(args: argparse.Namespace) -> int:
+    get_setup(args.setup)
+    source = Path(args.source)
+    documents = get_template(args.template).load(source)
+    print(
+        f"Loaded {len(documents)} documents from {source} "
+        f"(template {args.template}, sha256 {source_checksum(source)[:12]})."
+    )
+    print("Chunking and indexing are not implemented yet.")
     return 0
 
 
@@ -27,11 +47,16 @@ def build_parser() -> argparse.ArgumentParser:
     setups_parser = commands.add_parser("setups", help="List predefined setups.")
     setups_parser.set_defaults(handler=_print_setups)
 
+    templates_parser = commands.add_parser(
+        "templates", help="List ingestion templates."
+    )
+    templates_parser.set_defaults(handler=_print_templates)
+
     ingest_parser = commands.add_parser("ingest", help="Ingest source data.")
     ingest_parser.add_argument("source")
     ingest_parser.add_argument("--template", required=True)
     ingest_parser.add_argument("--setup", required=True)
-    ingest_parser.set_defaults(handler=_not_implemented)
+    ingest_parser.set_defaults(handler=_ingest)
 
     query_parser = commands.add_parser("query", help="Query an indexed setup.")
     query_parser.add_argument("query")

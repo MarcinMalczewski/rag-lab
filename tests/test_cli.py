@@ -1,15 +1,20 @@
+from pathlib import Path
+
 import pytest
 
 from rag_lab.cli import build_parser, main
+
+SAMPLE = str(Path(__file__).parents[1] / "data" / "sample" / "documents.jsonl")
 
 
 @pytest.mark.parametrize(
     ("command", "arguments"),
     [
         ("setups", []),
+        ("templates", []),
         (
             "ingest",
-            ["data", "--template", "jsonl-documents", "--setup", "naive-100-0"],
+            [SAMPLE, "--template", "jsonl-documents", "--setup", "naive-100-0"],
         ),
         ("query", ["What is RAG?", "--setup", "naive-100-0"]),
         ("status", []),
@@ -33,12 +38,17 @@ def test_setups_command_lists_predefined_setups(capsys: object) -> None:
     assert "naive-500-100" in output
 
 
-def test_ingest_shell_validates_setup(capsys: object) -> None:
+def test_templates_command_lists_templates(capsys: object) -> None:
+    assert main(["templates"]) == 0
+    assert "jsonl-documents" in capsys.readouterr().out  # type: ignore[attr-defined]
+
+
+def test_ingest_loads_sample_documents(capsys: object) -> None:
     assert (
         main(
             [
                 "ingest",
-                "data",
+                SAMPLE,
                 "--template",
                 "jsonl-documents",
                 "--setup",
@@ -47,4 +57,4 @@ def test_ingest_shell_validates_setup(capsys: object) -> None:
         )
         == 0
     )
-    assert "not implemented yet" in capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "Loaded 10 documents" in capsys.readouterr().out  # type: ignore[attr-defined]

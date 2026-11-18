@@ -3,7 +3,8 @@
 The CLI operates on a small set of setups and ingestion templates predefined in
 code. A setup fixes chunking, embedding, retrieval, and Qdrant indexing choices;
 a template converts one input format into normalized documents. Currently,
-`raglab setups` is implemented; the remaining commands are CLI placeholders.
+`raglab setups`, `raglab templates`, and the document-loading part of
+`raglab ingest` are implemented; the rest is placeholder.
 
 ```bash
 raglab setups
@@ -11,6 +12,21 @@ raglab setups
 
 Lists supported setup IDs and their main settings. Use it to discover valid
 values for `--setup`.
+
+```bash
+raglab templates
+```
+
+Lists ingestion template IDs; use it to discover valid values for `--template`.
+Only `jsonl-documents` exists so far.
+
+```bash
+raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup naive-100-0
+```
+
+Currently loads and validates the documents (reporting file and line on errors)
+and prints the count and source checksum; chunking and indexing are not
+implemented yet. The intended full behavior is:
 
 ```bash
 raglab ingest data/squad --template squad-contexts --setup naive-500-100
