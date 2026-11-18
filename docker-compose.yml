@@ -1,0 +1,27 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.12.4
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-raglab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-raglab}
+      POSTGRES_DB: ${POSTGRES_DB:-raglab}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-raglab} -d ${POSTGRES_DB:-raglab}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  qdrant_storage:
+  postgres_data:

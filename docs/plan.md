@@ -1,7 +1,8 @@
 # Implementation plan
 
-1. Create the Python project structure, configuration registry, and CLI shell.
-2. Run Qdrant locally and add a minimal provenance store.
+1. [x] Create the Python project structure, configuration registry, and CLI shell.
+2. [x] Run Qdrant locally (`docker compose up -d`) and add a minimal provenance
+   store (PostgreSQL, `rag_lab.provenance`).
 3. Implement ingestion templates for manual data, MS MARCO, and SQuAD.
 4. Add normalized document storage and deterministic chunk identities.
 5. Implement baseline token-window chunking profiles.

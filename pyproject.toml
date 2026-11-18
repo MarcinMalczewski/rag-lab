@@ -5,6 +5,7 @@ description = "A lab for reproducible RAG experiments."
 readme = "docs/README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "psycopg[binary]>=3.2",
     "pydantic-settings>=2.6",
 ]
 

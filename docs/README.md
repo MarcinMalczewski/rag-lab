@@ -25,6 +25,11 @@ may change as experiments produce evidence.
   chunks; alternative strategies are evaluated as explicit setups.
 - Embedding profiles, owner filtering, incremental updates, cross-modal search,
   and profile migrations are planned experiment dimensions.
-- Qdrant and Ollama are intended local dependencies; vector indexing and search
-  integration remain to be implemented and evaluated in this project.
+- Qdrant and PostgreSQL 17 run locally via Docker Compose (`./start.sh`; Qdrant
+  on port 6333, PostgreSQL on 5433). Ollama is an intended local dependency.
+- `rag_lab.provenance` stores setups, runs, and vector references in the
+  PostgreSQL `rag` schema. Tables are created on first use; versioned
+  migrations are not yet in place.
+- Vector indexing and search integration remain to be implemented and evaluated
+  in this project.
 
