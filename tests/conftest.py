@@ -1,8 +1,10 @@
+import random
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 import pytest
 from testcontainers.community.postgres import PostgresContainer
+from testcontainers.community.qdrant import QdrantContainer
 
 
 @pytest.fixture(scope="session")
@@ -31,3 +33,32 @@ def postgres_settings(
 def unique_id(prefix: str) -> str:
     """Return an ID no other test will use."""
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
+
+
+@pytest.fixture(scope="session")
+def qdrant() -> Iterator[QdrantContainer]:
+    """One disposable Qdrant container (same version as docker-compose.yml)."""
+    with QdrantContainer("qdrant/qdrant:v1.12.4") as container:
+        yield container
+
+
+@pytest.fixture
+def qdrant_url(qdrant: QdrantContainer, monkeypatch: pytest.MonkeyPatch) -> str:
+    """URL of the test Qdrant, also exported as QDRANT_URL for `get_settings()`."""
+    url = f"http://{qdrant.get_container_host_ip()}:{qdrant.get_exposed_port(6333)}"
+    monkeypatch.setenv("QDRANT_URL", url)
+    return url
+
+
+class FakeEmbedder:
+    """Deterministic embedder for tests; no model required."""
+
+    def __init__(self, dimensions: int = 8) -> None:
+        self.dimensions = dimensions
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        vectors = []
+        for text in texts:
+            rng = random.Random(text)
+            vectors.append([rng.random() for _ in range(self.dimensions)])
+        return vectors

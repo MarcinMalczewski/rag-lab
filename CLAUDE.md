@@ -2,12 +2,13 @@
 
 ## Project
 
-`rag-lab` is a lab for reproducible RAG experiments (Python >=3.11, managed with `uv`). It is at an early stage: only the CLI shell, settings, and setup registry exist. Ingestion, chunking, embedding, Qdrant indexing, and querying are **not implemented yet**; `ingest`, `query`, `status`, and `reset` are placeholders that validate `--setup` and print "not implemented yet"; `ingest` currently loads and validates documents via the chosen template and stores them in PostgreSQL (needs `./start.sh`).
+`rag-lab` is a lab for reproducible RAG experiments (Python >=3.11, managed with `uv`). It is at an early stage: only the CLI shell, settings, and setup registry exist. Ingestion, chunking, embedding, Qdrant indexing, and querying are **not implemented yet**; `ingest`, `query`, `status`, and `reset` are placeholders that validate `--setup` and print "not implemented yet"; `ingest` loads documents via the template, stores them in PostgreSQL, chunks, embeds (Ollama) and indexes into Qdrant (needs `./start.sh` and Ollama).
 
 ## Commands
 
 ```bash
 uv sync                        # install deps (incl. dev group) into .venv
+uv sync --extra hf             # also torch (CPU) + transformers for the huggingface provider
 uv run pytest                  # tests (testpaths=tests, pythonpath=src)
 uv run pytest tests/test_cli.py::name   # single test
 uv run ruff check . && uv run ruff format --check .
@@ -18,13 +19,15 @@ uv run raglab setups           # entry point rag_lab.cli:main
 ## Layout
 
 - `src/rag_lab/cli.py` — argparse CLI. `build_parser()` builds subcommands, each with `set_defaults(handler=...)`; `main(argv)` parses and dispatches, returning an int exit status. Add new commands by adding a subparser plus handler.
-- `src/rag_lab/setups.py` — frozen dataclasses `Setup` / `ChunkingProfile` and the `SETUPS` registry (`naive-100-0`, `naive-500-100`, `late-chunking-v1`). `get_setup()` raises `ValueError` listing valid IDs; `list_setups()` returns setups sorted by ID. New experiments = new registry entries (setups are code-defined, not config files).
-- `src/rag_lab/settings.py` — pydantic-settings `Settings` (reads env / `.env`): Qdrant URL/API key, embedding provider/model/dimensions/batch size, Ollama URL, request timeout/retries. See `.env.example`.
+- `src/rag_lab/setups.py` — frozen dataclasses `ChunkingProfile`, `EmbeddingProfile` (provider, model, dimensions) and `Setup`. `SETUPS` is generated as embedding profile × chunking profile (`nomic-naive-100-0`, `minilm-naive-500-100`, ...) plus the reserved `late-chunking-v1`. `get_setup()` raises `ValueError` listing valid IDs; `list_setups()` sorts by ID. Add experiments by adding a profile to `CHUNKING_PROFILES` / `EMBEDDING_PROFILES`.
+- `src/rag_lab/settings.py` — pydantic-settings `Settings` (reads env / `.env`): Qdrant URL/API key, Postgres, embedding batch size/device, Ollama URL, request timeout/retries. See `.env.example`.
 - `src/rag_lab/documents.py` / `templates.py` — normalized `Document` and the ingestion template registry (`IngestionTemplate` protocol with `load(source)`; `TEMPLATES`, `get_template`, `source_checksum`). Only `jsonl-documents` exists; add new templates as classes and register them in `TEMPLATES`. Sample data and questions live in `data/<source>/` (`data/sample/`).
 - `src/rag_lab/chunks.py` — `Chunk` model and `make_chunk_id(setup_id, document_id, index)` (UUID5; each chunk has its own ID, `document_id` is shared in the payload).
 - `src/rag_lab/chunker.py` — `chunk_document(document, setup)` dispatches on the profile strategy (`_CHUNKERS`); `token_window` is implemented, other strategies raise `NotImplementedError`. Tokens are approximated by a regex (words + punctuation), not the embedding model's tokenizer; chunks carry exact character offsets.
+- `src/rag_lab/embeddings.py` — `Embedder` protocol, `OllamaEmbedder` (`/api/embed`, batching, retries), `HuggingFaceEmbedder` (local transformers, mean pooling, L2-normalized; optional extra: `uv sync --extra hf`, a plain `uv sync` removes torch), `get_embedder(settings, profile)` (provider `ollama` or `huggingface` comes from the setup's embedding profile; URL, batch size, device from settings).
+- `src/rag_lab/vector_store.py` / `indexing.py` — `QdrantIndex` (collection per embedding space named `<model>-<dims>`, cosine, payload indexes) and `index_chunks()` (embed, upsert, verify count). Payload has `setup_id`, `run_id`, `document_id`, offsets and the chunk `text` (canonical document text is still in PostgreSQL `documents`). qdrant-client is pinned to 1.12.x to match the server image.
 - `src/rag_lab/provenance.py` — `ProvenanceStore` (psycopg, PostgreSQL schema `rag`): setups, runs, documents (keyed by corpus version = source checksum), vector refs. Needs `docker compose up -d` (Qdrant + Postgres 17, host port 5433); DB tests use a disposable Postgres via testcontainers (Docker required), not the dev database.
-- `tests/` — pytest tests. `conftest.py` starts a session-wide Postgres 17 testcontainer; the `postgres_settings` fixture points settings at it. Tests share the default schema, so use `unique_id()` for anything they create and assert on.
+- `tests/` — pytest tests. `conftest.py` starts a session-wide Postgres 17 testcontainer and a Qdrant one; `postgres_settings` / `qdrant_url` fixtures point settings at them, and `FakeEmbedder` replaces Ollama. Tests share the default schema, so use `unique_id()` for anything they create and assert on.
 - `docs/` — design docs (read before implementing features): `architecture.md` (indexing/query flow), `cli.md` (intended command behavior), `plan.md` (milestone order), `rag-strategy.md` / `rag-findings.md` (experiment direction), `sql-schema-analysis.md`.
 
 ## Design direction (from docs)

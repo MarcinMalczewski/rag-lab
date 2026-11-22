@@ -162,7 +162,11 @@ class ProvenanceStore:
     ) -> None:
         with self._conn.cursor() as cursor:
             cursor.executemany(
-                self._q("INSERT INTO {schema}.vector_refs VALUES (%s, %s, %s)"),
+                self._q(
+                    "INSERT INTO {schema}.vector_refs VALUES (%s, %s, %s) "
+                    "ON CONFLICT (collection, point_id) "
+                    "DO UPDATE SET run_id = EXCLUDED.run_id"
+                ),
                 [(run_id, collection, point_id) for point_id in point_ids],
             )
 

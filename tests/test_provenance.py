@@ -19,7 +19,7 @@ def store(postgres_settings: None) -> Iterator[ProvenanceStore]:
 
 
 def unique_setup() -> Setup:
-    return dataclasses.replace(get_setup("naive-100-0"), id=unique_id("setup"))
+    return dataclasses.replace(get_setup("nomic-naive-100-0"), id=unique_id("setup"))
 
 
 def test_run_lifecycle_and_vector_refs(store: ProvenanceStore) -> None:

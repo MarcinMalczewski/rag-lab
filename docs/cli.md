@@ -15,8 +15,8 @@ uv run raglab templates
 Ingest the sample documents (needs `./start.sh` first):
 
 ```bash
-uv run raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup naive-100-0
-uv run raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup naive-500-100
+uv run raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup nomic-naive-100-0
+uv run raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup nomic-naive-500-100
 ```
 
 Stop the services and follow logs:
@@ -41,13 +41,15 @@ The CLI operates on a small set of setups and ingestion templates predefined in
 code. A setup fixes chunking, embedding, retrieval, and Qdrant indexing choices;
 a template converts one input format into normalized documents. Currently,
 `raglab setups`, `raglab templates`, and the document-loading part of
-`raglab ingest` (documents are stored in PostgreSQL) are implemented; the rest is placeholder.
+`raglab ingest` (documents, chunks and vectors) are implemented; the rest is placeholder.
 
 ```bash
 raglab setups
 ```
 
-Lists supported setup IDs and their main settings. Use it to discover valid
+Lists supported setup IDs and their main settings. A setup ID is an embedding
+profile plus a chunking profile (`nomic`/`minilm` + `naive-100-0`/`naive-500-100`),
+generated from the registries in `setups.py`. Use it to discover valid
 values for `--setup`.
 
 ```bash
@@ -58,18 +60,24 @@ Lists ingestion template IDs; use it to discover valid values for `--template`.
 Only `jsonl-documents` exists so far.
 
 ```bash
-raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup naive-100-0
+raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup nomic-naive-100-0
 ```
 
 Currently loads and validates the documents (reporting file and line on errors),
 then saves them to PostgreSQL under the source checksum as the corpus version
 and records a run for the setup (status `documents_stored`). Re-ingesting the
 same source does not duplicate documents. It also chunks the documents in memory
-with the setup's chunking profile and prints chunk counts per document; the
-chunks are not saved yet. Embedding and indexing are not implemented yet. The intended full behavior is:
+with the setup's chunking profile, embeds the chunks with the setup's embedding profile: `nomic` uses Ollama
+(needs `ollama pull nomic-embed-text`), `minilm` runs locally through Hugging
+Face (needs `uv sync --extra hf`) and writes them to a Qdrant collection named
+after the embedding model and dimensions (e.g. `nomic-embed-text-768`). Points
+carry `setup_id`, `run_id`, `document_id`, offsets and the chunk text in the payload; their IDs
+are recorded in PostgreSQL and the run ends as `complete`, or `failed` if
+embedding or indexing errors. Setups whose chunking is not implemented
+(`late-chunking-v1`) only store the documents. The intended full behavior is:
 
 ```bash
-raglab ingest data/squad --template squad-contexts --setup naive-500-100
+raglab ingest data/squad --template squad-contexts --setup nomic-naive-500-100
 ```
 
 Normalizes input documents, then chunks and embeds them before writing vectors
@@ -82,7 +90,7 @@ and retain questions/answer spans for evaluation rather than treating questions
 as source documents.
 
 ```bash
-raglab query "What is late chunking?" --setup naive-500-100
+raglab query "What is late chunking?" --setup nomic-naive-500-100
 ```
 
 Embeds the query and searches only vectors indexed for the selected setup.
@@ -95,7 +103,7 @@ Shows each setup's indexed document/vector counts, target collection, last
 ingestion time, and readiness state.
 
 ```bash
-raglab reset --setup naive-500-100
+raglab reset --setup nomic-naive-500-100
 ```
 
 Removes only vectors and index metadata for the selected setup, allowing a clean

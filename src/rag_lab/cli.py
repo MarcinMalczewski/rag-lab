@@ -7,10 +7,15 @@ from pathlib import Path
 import psycopg
 
 from rag_lab.chunker import chunk_document
+from rag_lab.chunks import Chunk
+from rag_lab.documents import Document
+from rag_lab.embeddings import get_embedder
+from rag_lab.indexing import index_chunks
 from rag_lab.provenance import ProvenanceStore
-from rag_lab.settings import get_settings
-from rag_lab.setups import get_setup, list_setups
+from rag_lab.settings import Settings, get_settings
+from rag_lab.setups import Setup, get_setup, list_setups
 from rag_lab.templates import get_template, list_templates, source_checksum
+from rag_lab.vector_store import QdrantIndex
 
 
 def _print_setups(_: argparse.Namespace) -> int:
@@ -25,6 +30,10 @@ def _print_templates(_: argparse.Namespace) -> int:
     return 0
 
 
+def _chunk_all(documents: list[Document], setup: Setup) -> dict[str, list[Chunk]]:
+    return {d.document_id: chunk_document(d, setup) for d in documents}
+
+
 def _ingest(args: argparse.Namespace) -> int:
     setup = get_setup(args.setup)
     template = get_template(args.template)
@@ -33,37 +42,44 @@ def _ingest(args: argparse.Namespace) -> int:
     print(
         f"Setup:    {setup.id} ({chunking.strategy}, "
         f"size {chunking.chunk_size_tokens}, overlap {chunking.chunk_overlap_tokens}, "
-        f"{setup.embedding_model}, {setup.retrieval_mode})"
+        f"embedding {setup.embedding.id}: {setup.embedding.provider}/"
+        f"{setup.embedding.model}, {setup.embedding.dimensions} dims, "
+        f"{setup.retrieval_mode})"
     )
     print(f"Template: {template.id}")
     print(f"Source:   {source}")
 
     documents = template.load(source)
-    words = sum(len(document.text.split()) for document in documents)
-    chunk_counts: dict[str, int] | None
+    chunks_by_document: dict[str, list[Chunk]] | None
+    chunk_note = ""
     try:
-        chunk_counts = {
-            document.document_id: len(chunk_document(document, setup))
-            for document in documents
-        }
+        chunks_by_document = _chunk_all(documents, setup)
     except NotImplementedError as error:
-        chunk_counts = None
+        chunks_by_document = None
         chunk_note = f"Chunking skipped: {error}"
+    words = sum(len(document.text.split()) for document in documents)
     print(f"Loaded {len(documents)} documents ({words} words):")
     for document in documents:
         chunks = (
-            f", {chunk_counts[document.document_id]} chunks" if chunk_counts else ""
+            f", {len(chunks_by_document[document.document_id])} chunks"
+            if chunks_by_document
+            else ""
         )
         print(
             f"  {document.document_id}  {document.title or '-'} "
             f"({len(document.text.split())} words{chunks})"
         )
-    if chunk_counts is not None:
-        print(f"Chunked into {sum(chunk_counts.values())} chunks (in memory).")
-    else:
-        print(chunk_note)
     corpus_version = source_checksum(source)
     print(f"Corpus version (source checksum): {corpus_version[:12]}")
+    all_chunks = (
+        [c for chunks in chunks_by_document.values() for c in chunks]
+        if chunks_by_document
+        else []
+    )
+    if chunks_by_document is not None:
+        print(f"Chunked into {len(all_chunks)} chunks (in memory).")
+    else:
+        print(chunk_note)
 
     settings = get_settings()
     print(
@@ -80,17 +96,64 @@ def _ingest(args: argparse.Namespace) -> int:
             print(f"Started run {run_id}.")
             existing = store.count_documents(corpus_version)
             store.save_documents(corpus_version, documents)
-            store.finish_run(run_id, "documents_stored")
+            print(
+                f"Stored {len(documents)} documents "
+                f"({len(documents) - existing} new, {existing} already stored)."
+            )
+            if not all_chunks:
+                store.finish_run(run_id, "documents_stored")
+                print("Run finished with status documents_stored.")
+                return 0
+            try:
+                _index(setup, run_id, corpus_version, all_chunks, store, settings)
+            except Exception as error:
+                store.finish_run(run_id, "failed")
+                print(f"Indexing failed, run marked failed: {error}")
+                return 1
+            store.finish_run(run_id)
+            print("Run finished with status complete.")
     except psycopg.OperationalError as error:
         print(f"Cannot reach PostgreSQL (is ./start.sh running?): {error}")
         return 1
-    print(
-        f"Stored {len(documents)} documents "
-        f"({len(documents) - existing} new, {existing} already stored)."
-    )
-    print("Run finished with status documents_stored.")
-    print("Next: embedding and indexing are not implemented yet.")
     return 0
+
+
+def _index(
+    setup: Setup,
+    run_id: str,
+    corpus_version: str,
+    chunks: list[Chunk],
+    store: ProvenanceStore,
+    settings: Settings,
+) -> None:
+    profile = setup.embedding
+    embedder = get_embedder(settings, profile)
+    print(
+        f"Embedding {len(chunks)} chunks with {profile.provider}/{profile.model} "
+        f"(batch size {settings.embedding_batch_size})..."
+    )
+    index = QdrantIndex(settings.qdrant_url, settings.qdrant_api_key)
+    try:
+        result = index_chunks(
+            chunks,
+            setup,
+            run_id,
+            corpus_version,
+            embedder,
+            index,
+        )
+    finally:
+        index.close()
+    state = "created" if result.created_collection else "existing"
+    print(
+        f"Qdrant collection {result.collection} ({state}, "
+        f"{result.dimensions} dimensions)."
+    )
+    store.add_vector_refs(run_id, result.collection, result.point_ids)
+    print(
+        f"Indexed {len(result.point_ids)} points; verified in Qdrant and "
+        "recorded in PostgreSQL."
+    )
 
 
 def _not_implemented(args: argparse.Namespace) -> int:

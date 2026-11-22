@@ -12,8 +12,8 @@ chunk for each question and setup.
 
 | Approach | Expected to win on |
 |---|---|
-| Small window (`naive-100-0`) | Precise, single-fact lookups (groups A, C). Loses answers split across chunks. |
-| Large window with overlap (`naive-500-100`) | Questions needing several sentences (group A). Documents are only ~400–500 tokens, so this is close to one chunk per document. |
+| Small window (`nomic-naive-100-0`) | Precise, single-fact lookups (groups A, C). Loses answers split across chunks. |
+| Large window with overlap (`nomic-naive-500-100`) | Questions needing several sentences (group A). Documents are only ~400–500 tokens, so this is close to one chunk per document. |
 | Late chunking | Chunks that are ambiguous without the rest of the document (group B). |
 | Dense retrieval | Paraphrased questions with little word overlap (group D). |
 | Lexical / hybrid (BM25) | Exact identifiers, codes and rare terms (group C). |
@@ -84,7 +84,7 @@ ambiguous.
 
 ## Suggested reading of a comparison
 
-- A1, A2, A4 improving from `naive-100-0` to `naive-500-100` shows the cost of
+- A1, A2, A4 improving from `nomic-naive-100-0` to `nomic-naive-500-100` shows the cost of
   splitting answers across chunks.
 - B1–B4 improving under late chunking, but not A or C, is the specific benefit
   of contextual embeddings.

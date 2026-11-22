@@ -6,8 +6,10 @@ from rag_lab.setups import get_setup, list_setups
 def test_list_setups_is_stable() -> None:
     assert [setup.id for setup in list_setups()] == [
         "late-chunking-v1",
-        "naive-100-0",
-        "naive-500-100",
+        "minilm-naive-100-0",
+        "minilm-naive-500-100",
+        "nomic-naive-100-0",
+        "nomic-naive-500-100",
     ]
 
 

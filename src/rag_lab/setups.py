@@ -1,4 +1,4 @@
-"""Predefined RAG experiment setups."""
+"""Predefined RAG experiment setups: a chunking profile plus an embedding profile."""
 
 from dataclasses import dataclass
 
@@ -7,9 +7,20 @@ from dataclasses import dataclass
 class ChunkingProfile:
     """Chunking choices used to create document passages."""
 
+    id: str
     strategy: str
     chunk_size_tokens: int | None
     chunk_overlap_tokens: int | None
+
+
+@dataclass(frozen=True)
+class EmbeddingProfile:
+    """Everything that defines one embedding space."""
+
+    id: str
+    provider: str
+    model: str
+    dimensions: int | None
 
 
 @dataclass(frozen=True)
@@ -19,32 +30,56 @@ class Setup:
     id: str
     description: str
     chunking: ChunkingProfile
-    embedding_model: str
+    embedding: EmbeddingProfile
     retrieval_mode: str
 
 
+CHUNKING_PROFILES: tuple[ChunkingProfile, ...] = (
+    ChunkingProfile("naive-100-0", "token_window", 100, 0),
+    ChunkingProfile("naive-500-100", "token_window", 500, 100),
+)
+
+EMBEDDING_PROFILES: tuple[EmbeddingProfile, ...] = (
+    EmbeddingProfile("nomic", "ollama", "nomic-embed-text", 768),
+    EmbeddingProfile(
+        "minilm", "huggingface", "sentence-transformers/all-MiniLM-L6-v2", 384
+    ),
+)
+
+# Reserved until a late-chunking implementation chooses its model.
+_LATE_CHUNKING = Setup(
+    id="late-chunking-v1",
+    description="Reserved profile for the first late-chunking experiment.",
+    chunking=ChunkingProfile("late-chunking", "late_chunking", None, None),
+    embedding=EmbeddingProfile("model-dependent", "none", "model-dependent", None),
+    retrieval_mode="dense",
+)
+
+
+def _combine(chunking: ChunkingProfile, embedding: EmbeddingProfile) -> Setup:
+    return Setup(
+        id=f"{embedding.id}-{chunking.id}",
+        description=(
+            f"{chunking.chunk_size_tokens}-token windows, "
+            f"{chunking.chunk_overlap_tokens} overlap, {embedding.model} "
+            f"({embedding.provider}), dense retrieval."
+        ),
+        chunking=chunking,
+        embedding=embedding,
+        retrieval_mode="dense",
+    )
+
+
 SETUPS: dict[str, Setup] = {
-    "naive-100-0": Setup(
-        id="naive-100-0",
-        description="100-token windows with no overlap and dense retrieval.",
-        chunking=ChunkingProfile("token_window", 100, 0),
-        embedding_model="nomic-embed-text",
-        retrieval_mode="dense",
-    ),
-    "naive-500-100": Setup(
-        id="naive-500-100",
-        description="500-token windows with 100-token overlap and dense retrieval.",
-        chunking=ChunkingProfile("token_window", 500, 100),
-        embedding_model="nomic-embed-text",
-        retrieval_mode="dense",
-    ),
-    "late-chunking-v1": Setup(
-        id="late-chunking-v1",
-        description="Reserved profile for the first late-chunking experiment.",
-        chunking=ChunkingProfile("late_chunking", None, None),
-        embedding_model="model-dependent",
-        retrieval_mode="dense",
-    ),
+    setup.id: setup
+    for setup in (
+        *(
+            _combine(chunking, embedding)
+            for embedding in EMBEDDING_PROFILES
+            for chunking in CHUNKING_PROFILES
+        ),
+        _LATE_CHUNKING,
+    )
 }
 
 

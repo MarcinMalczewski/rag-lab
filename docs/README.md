@@ -31,6 +31,6 @@ may change as experiments produce evidence.
   PostgreSQL `rag` schema, together with the normalized documents saved by
   `raglab ingest`. Tables are created on first use; versioned migrations are
   not yet in place.
-- Vector indexing and search integration remain to be implemented and evaluated
-  in this project.
+- `raglab ingest` embeds chunks with Ollama and indexes them in Qdrant; search
+  (`raglab query`) remains to be implemented and evaluated in this project.
 

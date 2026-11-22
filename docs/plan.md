@@ -14,7 +14,12 @@
    2. [x] Deterministic chunk IDs (`rag_lab.chunks`) and `Chunk` model.
 5. [x] Implement baseline token-window chunking profiles
    (`rag_lab.chunker`; tokens are approximated by words and punctuation).
-6. Add embedding providers and index document chunks in Qdrant.
+6. Add embedding providers and index document chunks in Qdrant:
+   1. [x] Ollama embedding client (batching, retries); tested against a mocked
+      API only.
+   2. [x] Qdrant indexing: one collection per embedding space, filterable
+      payload, point IDs recorded in PostgreSQL, run marked complete.
+   3. [ ] End-to-end ingest with a real Ollama model (needs Ollama installed).
 7. Implement setup-scoped query and dense retrieval, fetching canonical
    passage text and metadata from PostgreSQL by the returned IDs.
 8. Add retrieval evaluation using dataset relevance labels.

@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "raglab: ingest sample (naive-100-0)",
+      "name": "raglab: ingest sample (nomic-naive-100-0)",
       "type": "debugpy",
       "request": "launch",
       "module": "rag_lab.cli",
@@ -12,7 +12,7 @@
         "--template",
         "jsonl-documents",
         "--setup",
-        "naive-100-0"
+        "nomic-naive-100-0"
       ],
       "cwd": "${workspaceFolder}",
       "env": { "PYTHONPATH": "${workspaceFolder}/src" },
@@ -21,7 +21,7 @@
       "justMyCode": false
     },
     {
-      "name": "raglab: ingest sample (naive-500-100)",
+      "name": "raglab: ingest sample (nomic-naive-500-100)",
       "type": "debugpy",
       "request": "launch",
       "module": "rag_lab.cli",
@@ -31,7 +31,7 @@
         "--template",
         "jsonl-documents",
         "--setup",
-        "naive-500-100"
+        "nomic-naive-500-100"
       ],
       "cwd": "${workspaceFolder}",
       "env": { "PYTHONPATH": "${workspaceFolder}/src" },
@@ -86,8 +86,14 @@
       "id": "setup",
       "type": "pickString",
       "description": "Setup ID",
-      "options": ["naive-100-0", "naive-500-100", "late-chunking-v1"],
-      "default": "naive-500-100"
+      "options": [
+        "nomic-naive-100-0",
+        "nomic-naive-500-100",
+        "minilm-naive-100-0",
+        "minilm-naive-500-100",
+        "late-chunking-v1"
+      ],
+      "default": "nomic-naive-500-100"
     },
     {
       "id": "simpleCommand",

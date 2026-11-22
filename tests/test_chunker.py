@@ -14,9 +14,9 @@ SAMPLE = Path(__file__).parents[1] / "data" / "sample" / "documents.jsonl"
 
 def setup_with(size: int | None, overlap: int | None) -> Setup:
     return dataclasses.replace(
-        get_setup("naive-100-0"),
+        get_setup("nomic-naive-100-0"),
         id="test-setup",
-        chunking=ChunkingProfile("token_window", size, overlap),
+        chunking=ChunkingProfile("test", "token_window", size, overlap),
     )
 
 
@@ -81,7 +81,7 @@ def test_unimplemented_strategy_is_reported() -> None:
         chunk_document(words(10), get_setup("late-chunking-v1"))
 
 
-@pytest.mark.parametrize("setup_id", ["naive-100-0", "naive-500-100"])
+@pytest.mark.parametrize("setup_id", ["nomic-naive-100-0", "nomic-naive-500-100"])
 def test_sample_documents_are_fully_covered(setup_id: str) -> None:
     setup = get_setup(setup_id)
     for document in get_template("jsonl-documents").load(SAMPLE):
