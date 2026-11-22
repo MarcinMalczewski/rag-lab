@@ -3,6 +3,9 @@ from pathlib import Path
 import pytest
 
 from rag_lab.cli import build_parser, main
+from rag_lab.provenance import ProvenanceStore
+from rag_lab.settings import get_settings
+from rag_lab.templates import source_checksum
 
 SAMPLE = str(Path(__file__).parents[1] / "data" / "sample" / "documents.jsonl")
 
@@ -43,18 +46,16 @@ def test_templates_command_lists_templates(capsys: object) -> None:
     assert "jsonl-documents" in capsys.readouterr().out  # type: ignore[attr-defined]
 
 
-def test_ingest_loads_sample_documents(capsys: object) -> None:
-    assert (
-        main(
-            [
-                "ingest",
-                SAMPLE,
-                "--template",
-                "jsonl-documents",
-                "--setup",
-                "naive-100-0",
-            ]
-        )
-        == 0
-    )
-    assert "Loaded 10 documents" in capsys.readouterr().out  # type: ignore[attr-defined]
+def test_ingest_stores_sample_documents(
+    postgres_settings: None, capsys: object
+) -> None:
+    arguments = ["ingest", SAMPLE, "--template", "jsonl-documents", "--setup"]
+
+    assert main([*arguments, "naive-100-0"]) == 0
+    assert "Stored 10 documents" in capsys.readouterr().out  # type: ignore[attr-defined]
+    assert main([*arguments, "naive-500-100"]) == 0  # same corpus, other setup
+
+    settings = get_settings()
+    with ProvenanceStore(settings.postgres_dsn, settings.provenance_schema) as store:
+        documents = store.load_documents(source_checksum(Path(SAMPLE)))
+    assert len(documents) == 10

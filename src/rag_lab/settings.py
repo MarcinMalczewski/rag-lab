@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     postgres_db: str = "raglab"
     postgres_host: str = "localhost"
     postgres_port: int = 5433
+    provenance_schema: str = "rag"
 
     embedding_provider: str = "ollama"
     embedding_model: str = "nomic-embed-text"

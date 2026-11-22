@@ -28,8 +28,9 @@ may change as experiments produce evidence.
 - Qdrant and PostgreSQL 17 run locally via Docker Compose (`./start.sh`; Qdrant
   on port 6333, PostgreSQL on 5433). Ollama is an intended local dependency.
 - `rag_lab.provenance` stores setups, runs, and vector references in the
-  PostgreSQL `rag` schema. Tables are created on first use; versioned
-  migrations are not yet in place.
+  PostgreSQL `rag` schema, together with the normalized documents saved by
+  `raglab ingest`. Tables are created on first use; versioned migrations are
+  not yet in place.
 - Vector indexing and search integration remain to be implemented and evaluated
   in this project.
 

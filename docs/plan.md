@@ -8,7 +8,10 @@
    2. [x] `jsonl-documents` template (manual data, `data/sample/`).
    3. [ ] MS MARCO template.
    4. [ ] SQuAD template.
-4. Add normalized document storage and deterministic chunk identities.
+4. Add normalized document storage and deterministic chunk identities:
+   1. [x] Store normalized documents in PostgreSQL, keyed by corpus version
+      (source checksum).
+   2. [x] Deterministic chunk IDs (`rag_lab.chunks`) and `Chunk` model.
 5. Implement baseline token-window chunking profiles.
 6. Add embedding providers and index document chunks in Qdrant.
 7. Implement setup-scoped query and dense retrieval, fetching canonical

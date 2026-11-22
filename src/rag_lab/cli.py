@@ -4,6 +4,10 @@ import argparse
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
+import psycopg
+
+from rag_lab.provenance import ProvenanceStore
+from rag_lab.settings import get_settings
 from rag_lab.setups import get_setup, list_setups
 from rag_lab.templates import get_template, list_templates, source_checksum
 
@@ -21,14 +25,54 @@ def _print_templates(_: argparse.Namespace) -> int:
 
 
 def _ingest(args: argparse.Namespace) -> int:
-    get_setup(args.setup)
+    setup = get_setup(args.setup)
+    template = get_template(args.template)
     source = Path(args.source)
-    documents = get_template(args.template).load(source)
+    chunking = setup.chunking
     print(
-        f"Loaded {len(documents)} documents from {source} "
-        f"(template {args.template}, sha256 {source_checksum(source)[:12]})."
+        f"Setup:    {setup.id} ({chunking.strategy}, "
+        f"size {chunking.chunk_size_tokens}, overlap {chunking.chunk_overlap_tokens}, "
+        f"{setup.embedding_model}, {setup.retrieval_mode})"
     )
-    print("Chunking and indexing are not implemented yet.")
+    print(f"Template: {template.id}")
+    print(f"Source:   {source}")
+
+    documents = template.load(source)
+    words = sum(len(document.text.split()) for document in documents)
+    print(f"Loaded {len(documents)} documents ({words} words):")
+    for document in documents:
+        print(
+            f"  {document.document_id}  {document.title or '-'} "
+            f"({len(document.text.split())} words)"
+        )
+    corpus_version = source_checksum(source)
+    print(f"Corpus version (source checksum): {corpus_version[:12]}")
+
+    settings = get_settings()
+    print(
+        f"Connecting to PostgreSQL {settings.postgres_host}:{settings.postgres_port}"
+        f"/{settings.postgres_db} (schema {settings.provenance_schema})..."
+    )
+    try:
+        with ProvenanceStore(
+            settings.postgres_dsn, settings.provenance_schema
+        ) as store:
+            store.register_setup(setup)
+            print(f"Registered setup {setup.id}.")
+            run_id = store.start_run(setup.id, template.id, corpus_version)
+            print(f"Started run {run_id}.")
+            existing = store.count_documents(corpus_version)
+            store.save_documents(corpus_version, documents)
+            store.finish_run(run_id, "documents_stored")
+    except psycopg.OperationalError as error:
+        print(f"Cannot reach PostgreSQL (is ./start.sh running?): {error}")
+        return 1
+    print(
+        f"Stored {len(documents)} documents "
+        f"({len(documents) - existing} new, {existing} already stored)."
+    )
+    print("Run finished with status documents_stored.")
+    print("Next: chunking and indexing are not implemented yet.")
     return 0
 
 

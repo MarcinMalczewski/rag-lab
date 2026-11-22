@@ -1,10 +1,47 @@
 # CLI
 
+## Quick start (copy and paste)
+
+```bash
+uv sync                # install dependencies (once)
+./start.sh             # start Qdrant and PostgreSQL; creates .env if missing
+```
+
+```bash
+uv run raglab setups
+uv run raglab templates
+```
+
+Ingest the sample documents (needs `./start.sh` first):
+
+```bash
+uv run raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup naive-100-0
+uv run raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup naive-500-100
+```
+
+Stop the services and follow logs:
+
+```bash
+docker compose --env-file .env -f docker-compose.yml down
+docker compose --env-file .env -f docker-compose.yml logs -f qdrant postgres
+```
+
+Tests and checks (tests need Docker):
+
+```bash
+uv run pytest
+uv run ruff check . && uv run ruff format --check . && uv run mypy
+```
+
+`query`, `status` and `reset` are placeholders for now.
+
+## Commands
+
 The CLI operates on a small set of setups and ingestion templates predefined in
 code. A setup fixes chunking, embedding, retrieval, and Qdrant indexing choices;
 a template converts one input format into normalized documents. Currently,
 `raglab setups`, `raglab templates`, and the document-loading part of
-`raglab ingest` are implemented; the rest is placeholder.
+`raglab ingest` (documents are stored in PostgreSQL) are implemented; the rest is placeholder.
 
 ```bash
 raglab setups
@@ -24,8 +61,10 @@ Only `jsonl-documents` exists so far.
 raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup naive-100-0
 ```
 
-Currently loads and validates the documents (reporting file and line on errors)
-and prints the count and source checksum; chunking and indexing are not
+Currently loads and validates the documents (reporting file and line on errors),
+then saves them to PostgreSQL under the source checksum as the corpus version
+and records a run for the setup (status `documents_stored`). Re-ingesting the
+same source does not duplicate documents. Chunking and indexing are not
 implemented yet. The intended full behavior is:
 
 ```bash

@@ -2,7 +2,7 @@
 
 ## Project
 
-`rag-lab` is a lab for reproducible RAG experiments (Python >=3.11, managed with `uv`). It is at an early stage: only the CLI shell, settings, and setup registry exist. Ingestion, chunking, embedding, Qdrant indexing, and querying are **not implemented yet**; `ingest`, `query`, `status`, and `reset` are placeholders that validate `--setup` and print "not implemented yet"; `ingest` currently only loads and validates documents via the chosen template.
+`rag-lab` is a lab for reproducible RAG experiments (Python >=3.11, managed with `uv`). It is at an early stage: only the CLI shell, settings, and setup registry exist. Ingestion, chunking, embedding, Qdrant indexing, and querying are **not implemented yet**; `ingest`, `query`, `status`, and `reset` are placeholders that validate `--setup` and print "not implemented yet"; `ingest` currently loads and validates documents via the chosen template and stores them in PostgreSQL (needs `./start.sh`).
 
 ## Commands
 
@@ -21,8 +21,9 @@ uv run raglab setups           # entry point rag_lab.cli:main
 - `src/rag_lab/setups.py` — frozen dataclasses `Setup` / `ChunkingProfile` and the `SETUPS` registry (`naive-100-0`, `naive-500-100`, `late-chunking-v1`). `get_setup()` raises `ValueError` listing valid IDs; `list_setups()` returns setups sorted by ID. New experiments = new registry entries (setups are code-defined, not config files).
 - `src/rag_lab/settings.py` — pydantic-settings `Settings` (reads env / `.env`): Qdrant URL/API key, embedding provider/model/dimensions/batch size, Ollama URL, request timeout/retries. See `.env.example`.
 - `src/rag_lab/documents.py` / `templates.py` — normalized `Document` and the ingestion template registry (`IngestionTemplate` protocol with `load(source)`; `TEMPLATES`, `get_template`, `source_checksum`). Only `jsonl-documents` exists; add new templates as classes and register them in `TEMPLATES`. Sample data and questions live in `data/<source>/` (`data/sample/`).
-- `src/rag_lab/provenance.py` — `ProvenanceStore` (psycopg, PostgreSQL schema `rag`): setups, runs, vector refs. Needs `docker compose up -d` (Qdrant + Postgres 17, host port 5433); DB tests skip if Postgres is unreachable.
-- `tests/` — pytest tests for CLI and setups.
+- `src/rag_lab/chunks.py` — `Chunk` model and `make_chunk_id(setup_id, document_id, index)` (UUID5; each chunk has its own ID, `document_id` is shared in the payload).
+- `src/rag_lab/provenance.py` — `ProvenanceStore` (psycopg, PostgreSQL schema `rag`): setups, runs, documents (keyed by corpus version = source checksum), vector refs. Needs `docker compose up -d` (Qdrant + Postgres 17, host port 5433); DB tests use a disposable Postgres via testcontainers (Docker required), not the dev database.
+- `tests/` — pytest tests. `conftest.py` starts a session-wide Postgres 17 testcontainer; the `postgres_settings` fixture points settings at it. Tests share the default schema, so use `unique_id()` for anything they create and assert on.
 - `docs/` — design docs (read before implementing features): `architecture.md` (indexing/query flow), `cli.md` (intended command behavior), `plan.md` (milestone order), `rag-strategy.md` / `rag-findings.md` (experiment direction), `sql-schema-analysis.md`.
 
 ## Design direction (from docs)
