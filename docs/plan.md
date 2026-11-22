@@ -12,7 +12,8 @@
    1. [x] Store normalized documents in PostgreSQL, keyed by corpus version
       (source checksum).
    2. [x] Deterministic chunk IDs (`rag_lab.chunks`) and `Chunk` model.
-5. Implement baseline token-window chunking profiles.
+5. [x] Implement baseline token-window chunking profiles
+   (`rag_lab.chunker`; tokens are approximated by words and punctuation).
 6. Add embedding providers and index document chunks in Qdrant.
 7. Implement setup-scoped query and dense retrieval, fetching canonical
    passage text and metadata from PostgreSQL by the returned IDs.

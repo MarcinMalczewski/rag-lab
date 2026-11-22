@@ -6,6 +6,7 @@ from pathlib import Path
 
 import psycopg
 
+from rag_lab.chunker import chunk_document
 from rag_lab.provenance import ProvenanceStore
 from rag_lab.settings import get_settings
 from rag_lab.setups import get_setup, list_setups
@@ -39,12 +40,28 @@ def _ingest(args: argparse.Namespace) -> int:
 
     documents = template.load(source)
     words = sum(len(document.text.split()) for document in documents)
+    chunk_counts: dict[str, int] | None
+    try:
+        chunk_counts = {
+            document.document_id: len(chunk_document(document, setup))
+            for document in documents
+        }
+    except NotImplementedError as error:
+        chunk_counts = None
+        chunk_note = f"Chunking skipped: {error}"
     print(f"Loaded {len(documents)} documents ({words} words):")
     for document in documents:
+        chunks = (
+            f", {chunk_counts[document.document_id]} chunks" if chunk_counts else ""
+        )
         print(
             f"  {document.document_id}  {document.title or '-'} "
-            f"({len(document.text.split())} words)"
+            f"({len(document.text.split())} words{chunks})"
         )
+    if chunk_counts is not None:
+        print(f"Chunked into {sum(chunk_counts.values())} chunks (in memory).")
+    else:
+        print(chunk_note)
     corpus_version = source_checksum(source)
     print(f"Corpus version (source checksum): {corpus_version[:12]}")
 
@@ -72,7 +89,7 @@ def _ingest(args: argparse.Namespace) -> int:
         f"({len(documents) - existing} new, {existing} already stored)."
     )
     print("Run finished with status documents_stored.")
-    print("Next: chunking and indexing are not implemented yet.")
+    print("Next: embedding and indexing are not implemented yet.")
     return 0
 
 

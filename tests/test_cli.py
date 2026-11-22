@@ -52,7 +52,9 @@ def test_ingest_stores_sample_documents(
     arguments = ["ingest", SAMPLE, "--template", "jsonl-documents", "--setup"]
 
     assert main([*arguments, "naive-100-0"]) == 0
-    assert "Stored 10 documents" in capsys.readouterr().out  # type: ignore[attr-defined]
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "Stored 10 documents" in output
+    assert "Chunked into" in output
     assert main([*arguments, "naive-500-100"]) == 0  # same corpus, other setup
 
     settings = get_settings()

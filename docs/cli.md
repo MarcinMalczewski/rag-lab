@@ -64,8 +64,9 @@ raglab ingest data/sample/documents.jsonl --template jsonl-documents --setup nai
 Currently loads and validates the documents (reporting file and line on errors),
 then saves them to PostgreSQL under the source checksum as the corpus version
 and records a run for the setup (status `documents_stored`). Re-ingesting the
-same source does not duplicate documents. Chunking and indexing are not
-implemented yet. The intended full behavior is:
+same source does not duplicate documents. It also chunks the documents in memory
+with the setup's chunking profile and prints chunk counts per document; the
+chunks are not saved yet. Embedding and indexing are not implemented yet. The intended full behavior is:
 
 ```bash
 raglab ingest data/squad --template squad-contexts --setup naive-500-100
