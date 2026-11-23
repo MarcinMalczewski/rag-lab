@@ -33,15 +33,21 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check . && uv run mypy
 ```
 
-`query`, `status` and `reset` are placeholders for now.
+Query after ingesting (needs a complete run for that setup):
+
+```bash
+uv run raglab query "What is late chunking?" --setup nomic-naive-500-100 --top-k 5
+```
+
+`status` and `reset` are placeholders for now.
 
 ## Commands
 
 The CLI operates on a small set of setups and ingestion templates predefined in
 code. A setup fixes chunking, embedding, retrieval, and Qdrant indexing choices;
 a template converts one input format into normalized documents. Currently,
-`raglab setups`, `raglab templates`, and the document-loading part of
-`raglab ingest` (documents, chunks and vectors) are implemented; the rest is placeholder.
+`raglab setups`, `raglab templates`, `raglab ingest` (documents, chunks and
+vectors) and `raglab query` are implemented; `status` and `reset` are placeholders.
 
 ```bash
 raglab setups
@@ -93,7 +99,13 @@ as source documents.
 raglab query "What is late chunking?" --setup nomic-naive-500-100
 ```
 
-Embeds the query and searches only vectors indexed for the selected setup.
+Embeds the query with the setup's embedding profile and searches only the
+selected setup's vectors from its latest complete run. `--top-k` (default 5)
+sets the number of results. Each result shows rank, cosine score, document,
+title, character range and a text preview; the text and metadata are read from
+PostgreSQL by document ID and offsets, not from the Qdrant payload. A setup
+without a complete run (never ingested, or ingest failed) is reported as an
+error. Query prefixes (`search_query:`) are not applied yet.
 
 ```bash
 raglab status

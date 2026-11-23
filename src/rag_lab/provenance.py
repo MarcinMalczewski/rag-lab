@@ -148,6 +148,31 @@ class ProvenanceStore:
             (status, run_id),
         )
 
+    def latest_complete_run(self, setup_id: str) -> tuple[str, str] | None:
+        """Return (run_id, corpus_version) of the newest complete run, if any."""
+        row = self._conn.execute(
+            self._q(
+                "SELECT run_id, corpus_version FROM {schema}.runs "
+                "WHERE setup_id = %s AND status = 'complete' "
+                "ORDER BY finished_at DESC LIMIT 1"
+            ),
+            (setup_id,),
+        ).fetchone()
+        return None if row is None else (str(row[0]), str(row[1]))
+
+    def get_documents(
+        self, corpus_version: str, document_ids: list[str]
+    ) -> dict[str, Document]:
+        """Return the requested documents of a corpus version keyed by ID."""
+        rows = self._conn.execute(
+            self._q(
+                "SELECT document_id, text, title, metadata FROM {schema}.documents "
+                "WHERE corpus_version = %s AND document_id = ANY(%s)"
+            ),
+            (corpus_version, document_ids),
+        ).fetchall()
+        return {str(i): Document(str(i), str(t), title, m) for i, t, title, m in rows}
+
     def run_status(self, run_id: str) -> str:
         row = self._conn.execute(
             self._q("SELECT status FROM {schema}.runs WHERE run_id = %s"),

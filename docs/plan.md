@@ -20,7 +20,7 @@
    2. [x] Qdrant indexing: one collection per embedding space, filterable
       payload, point IDs recorded in PostgreSQL, run marked complete.
    3. [ ] End-to-end ingest with a real Ollama model (needs Ollama installed).
-7. Implement setup-scoped query and dense retrieval, fetching canonical
+7. [x] Implement setup-scoped query and dense retrieval, fetching canonical
    passage text and metadata from PostgreSQL by the returned IDs.
 8. Add retrieval evaluation using dataset relevance labels.
 9. Compare chunking profiles and record experiment results.

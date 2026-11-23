@@ -124,3 +124,36 @@ def test_ingest_skips_embedding_for_unimplemented_chunking(
     assert status == 0
     assert "Chunking skipped" in output
     assert "documents_stored" in output
+
+
+def test_query_returns_passages_after_ingest(
+    postgres_settings: None,
+    qdrant_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: object,
+) -> None:
+    monkeypatch.setattr("rag_lab.cli.get_embedder", lambda *_: FakeEmbedder(768))
+    ingest = ["ingest", SAMPLE, "--template", "jsonl-documents", "--setup"]
+    assert main([*ingest, "nomic-naive-100-0"]) == 0
+    capsys.readouterr()  # type: ignore[attr-defined]
+
+    assert (
+        main(["query", "late chunking", "--setup", "nomic-naive-100-0", "--top-k", "3"])
+        == 0
+    )
+
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "1. score" in output and "3. score" in output and "4. score" not in output
+    assert "doc-" in output
+
+
+def test_query_reports_setup_without_complete_run(
+    postgres_settings: None,
+    qdrant_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: object,
+) -> None:
+    monkeypatch.setattr("rag_lab.cli.get_embedder", lambda *_: FakeEmbedder(384))
+
+    assert main(["query", "anything", "--setup", "minilm-naive-500-100"]) == 1
+    assert "no complete run" in capsys.readouterr().out  # type: ignore[attr-defined]

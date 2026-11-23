@@ -9,13 +9,16 @@ import psycopg
 from rag_lab.chunker import chunk_document
 from rag_lab.chunks import Chunk
 from rag_lab.documents import Document
-from rag_lab.embeddings import get_embedder
+from rag_lab.embeddings import EmbeddingError, get_embedder
 from rag_lab.indexing import index_chunks
 from rag_lab.provenance import ProvenanceStore
+from rag_lab.retrieval import search_setup
 from rag_lab.settings import Settings, get_settings
 from rag_lab.setups import Setup, get_setup, list_setups
 from rag_lab.templates import get_template, list_templates, source_checksum
 from rag_lab.vector_store import QdrantIndex
+
+PREVIEW_CHARS = 300
 
 
 def _print_setups(_: argparse.Namespace) -> int:
@@ -156,6 +159,47 @@ def _index(
     )
 
 
+def _query(args: argparse.Namespace) -> int:
+    setup = get_setup(args.setup)
+    settings = get_settings()
+    print(f"Setup: {setup.id} (embedding {setup.embedding.id})")
+    print(f"Query: {args.query!r} (top {args.top_k})")
+    try:
+        with ProvenanceStore(
+            settings.postgres_dsn, settings.provenance_schema
+        ) as store:
+            embedder = get_embedder(settings, setup.embedding)
+            index = QdrantIndex(settings.qdrant_url, settings.qdrant_api_key)
+            try:
+                result = search_setup(
+                    args.query, setup, embedder, index, store, args.top_k
+                )
+            finally:
+                index.close()
+    except psycopg.OperationalError as error:
+        print(f"Cannot reach PostgreSQL (is ./start.sh running?): {error}")
+        return 1
+    except (ValueError, EmbeddingError) as error:
+        print(f"Query failed: {error}")
+        return 1
+    print(
+        f"Searched run {result.run_id} (corpus {result.corpus_version[:12]}) "
+        f"in collection {result.collection}."
+    )
+    if not result.passages:
+        print("No results.")
+    for passage in result.passages:
+        preview = " ".join(passage.text.split())
+        if len(preview) > PREVIEW_CHARS:
+            preview = preview[:PREVIEW_CHARS] + "..."
+        print(
+            f"\n{passage.rank}. score {passage.score:.4f}  {passage.document_id}  "
+            f"{passage.title or '-'}  [chars {passage.start_char}-{passage.end_char}]"
+        )
+        print(f"   {preview}")
+    return 0
+
+
 def _not_implemented(args: argparse.Namespace) -> int:
     if hasattr(args, "setup"):
         get_setup(args.setup)
@@ -185,7 +229,8 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser = commands.add_parser("query", help="Query an indexed setup.")
     query_parser.add_argument("query")
     query_parser.add_argument("--setup", required=True)
-    query_parser.set_defaults(handler=_not_implemented)
+    query_parser.add_argument("--top-k", type=int, default=5)
+    query_parser.set_defaults(handler=_query)
 
     status_parser = commands.add_parser("status", help="Show index status.")
     status_parser.set_defaults(handler=_not_implemented)

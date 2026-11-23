@@ -2,10 +2,21 @@
 
 import re
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    """One search result: point ID, similarity score and payload."""
+
+    point_id: str
+    score: float
+    payload: dict[str, Any]
+
 
 PAYLOAD_INDEXES = ("setup_id", "run_id", "document_id")
 UPSERT_BATCH_SIZE = 128
@@ -76,6 +87,33 @@ class QdrantIndex:
         """Return the payload of one point."""
         (point,) = self._client.retrieve(name, ids=[point_id], with_payload=True)
         return dict(point.payload or {})
+
+    def search(
+        self,
+        name: str,
+        vector: Sequence[float],
+        top_k: int,
+        **payload_equals: str,
+    ) -> list[SearchHit]:
+        """Dense search restricted to points whose payload fields match."""
+        if not self._client.collection_exists(name):
+            raise ValueError(f"Collection '{name}' does not exist; ingest first.")
+        response = self._client.query_points(
+            name,
+            query=list(vector),
+            query_filter=models.Filter(
+                must=[
+                    models.FieldCondition(key=k, match=models.MatchValue(value=v))
+                    for k, v in payload_equals.items()
+                ]
+            ),
+            limit=top_k,
+            with_payload=True,
+        )
+        return [
+            SearchHit(str(point.id), point.score, dict(point.payload or {}))
+            for point in response.points
+        ]
 
     def count(self, name: str, **payload_equals: str) -> int:
         """Exact number of points whose payload fields equal the given values."""
