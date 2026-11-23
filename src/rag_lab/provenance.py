@@ -1,7 +1,7 @@
 """Minimal PostgreSQL provenance store for setups, runs, and vector references."""
 
 from dataclasses import asdict
-from typing import Self
+from typing import Any, Self
 
 import psycopg
 from psycopg import sql
@@ -32,6 +32,16 @@ CREATE TABLE IF NOT EXISTS {schema}.runs (
     status TEXT NOT NULL DEFAULT 'running',
     started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     finished_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS {schema}.evaluations (
+    evaluation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    run_id UUID NOT NULL REFERENCES {schema}.runs(run_id),
+    questions_file TEXT NOT NULL,
+    questions_checksum TEXT NOT NULL,
+    top_k INTEGER NOT NULL,
+    summary JSONB NOT NULL,
+    details JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS {schema}.vector_refs (
     run_id UUID NOT NULL REFERENCES {schema}.runs(run_id),
@@ -172,6 +182,54 @@ class ProvenanceStore:
             (corpus_version, document_ids),
         ).fetchall()
         return {str(i): Document(str(i), str(t), title, m) for i, t, title, m in rows}
+
+    def save_evaluation(
+        self,
+        run_id: str,
+        questions_file: str,
+        questions_checksum: str,
+        top_k: int,
+        summary: dict[str, Any],
+        details: list[dict[str, Any]],
+    ) -> str:
+        """Record an evaluation of a run and return its ID."""
+        row = self._conn.execute(
+            self._q(
+                "INSERT INTO {schema}.evaluations (run_id, questions_file, "
+                "questions_checksum, top_k, summary, details) "
+                "VALUES (%s, %s, %s, %s, %s, %s) RETURNING evaluation_id"
+            ),
+            (
+                run_id,
+                questions_file,
+                questions_checksum,
+                top_k,
+                Jsonb(summary),
+                Jsonb(details),
+            ),
+        ).fetchone()
+        assert row is not None
+        return str(row[0])
+
+    def load_evaluations(self, run_id: str) -> list[dict[str, Any]]:
+        """Return the evaluations of a run, oldest first."""
+        rows = self._conn.execute(
+            self._q(
+                "SELECT evaluation_id, questions_file, top_k, summary, details "
+                "FROM {schema}.evaluations WHERE run_id = %s ORDER BY created_at"
+            ),
+            (run_id,),
+        ).fetchall()
+        return [
+            {
+                "evaluation_id": str(i),
+                "questions_file": f,
+                "top_k": k,
+                "summary": summary,
+                "details": details,
+            }
+            for i, f, k, summary, details in rows
+        ]
 
     def run_status(self, run_id: str) -> str:
         row = self._conn.execute(

@@ -4,6 +4,9 @@ Questions for comparing chunking profiles and retrieval approaches on
 [documents.jsonl](documents.jsonl). Each row gives the expected document(s), the
 fact that answers the question, and what a difference in results would reveal.
 
+Machine-readable labels with exact answer spans for every question are in
+[questions.jsonl](questions.jsonl).
+
 Pass criterion: an expected document appears in the top-k (k = 5 suggested) and
 the retrieved chunk contains the answer. Record the rank of the first correct
 chunk for each question and setup.
@@ -37,7 +40,7 @@ ambiguous.
 |---|---|---|---|
 | sample-B1 | What problems has the growing number of climbers caused on Everest? | doc-007 | Queues near the summit, waste, debate about Sherpa support. The final paragraph never contains the word "Everest". |
 | sample-B2 | What limits the rate of photosynthesis? | doc-010 | Light intensity, carbon dioxide concentration and temperature. The final paragraph never contains the word "photosynthesis". |
-| sample-B3 | Why might a small recall difference between two RAG setups not come from chunking? | doc-001 | Approximate search (HNSW) adds its own noise; fix index settings or compare with brute force. The paragraph never mentions "HNSW" by name. |
+| sample-B3 | Why might a small recall difference between two RAG setups not come from chunking? | doc-001 | Approximate search (HNSW) adds its own noise; fix index settings or compare with brute force. Only the last sentence of the paragraph names HNSW. |
 | sample-B4 | When are neighbouring hits merged before the LLM sees them? | doc-006 | A merge policy combines adjacent chunks of the same document into one longer passage. |
 
 ## C. Exact identifiers and rare terms (lexical / hybrid should win)

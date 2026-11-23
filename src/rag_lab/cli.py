@@ -10,6 +10,7 @@ from rag_lab.chunker import chunk_document
 from rag_lab.chunks import Chunk
 from rag_lab.documents import Document
 from rag_lab.embeddings import EmbeddingError, get_embedder
+from rag_lab.evaluation import evaluate_setup, load_questions, result_details
 from rag_lab.indexing import index_chunks
 from rag_lab.provenance import ProvenanceStore
 from rag_lab.retrieval import search_setup
@@ -200,6 +201,86 @@ def _query(args: argparse.Namespace) -> int:
     return 0
 
 
+def _percent(value: float | None) -> str:
+    return "-" if value is None else f"{value:.2f}"
+
+
+def _print_metrics(label: str, metrics: dict[str, float]) -> None:
+    print(
+        f"  {label:<8} n={int(metrics['questions']):<3} "
+        f"recall {_percent(metrics['recall'])}  "
+        f"precision {_percent(metrics['precision'])}  "
+        f"hit {_percent(metrics['hit_rate'])}  mrr {_percent(metrics['mrr'])}  "
+        f"ndcg {_percent(metrics['ndcg'])}"
+    )
+
+
+def _evaluate(args: argparse.Namespace) -> int:
+    setup = get_setup(args.setup)
+    path = Path(args.questions)
+    questions = load_questions(path)
+    settings = get_settings()
+    print(f"Setup: {setup.id} (embedding {setup.embedding.id})")
+    print(f"Questions: {path} ({len(questions)} questions), top {args.top_k}")
+    try:
+        with ProvenanceStore(
+            settings.postgres_dsn, settings.provenance_schema
+        ) as store:
+            index = QdrantIndex(settings.qdrant_url, settings.qdrant_api_key)
+            try:
+                report = evaluate_setup(
+                    questions,
+                    setup,
+                    get_embedder(settings, setup.embedding),
+                    index,
+                    store,
+                    args.top_k,
+                )
+            finally:
+                index.close()
+            evaluation_id = store.save_evaluation(
+                report.run_id,
+                str(path),
+                source_checksum(path),
+                args.top_k,
+                report.summary,
+                result_details(report),
+            )
+    except psycopg.OperationalError as error:
+        print(f"Cannot reach PostgreSQL (is ./start.sh running?): {error}")
+        return 1
+    except (ValueError, EmbeddingError) as error:
+        print(f"Evaluation failed: {error}")
+        return 1
+    print(f"Run {report.run_id} (corpus {report.corpus_version[:12]}).\n")
+    for result in report.results:
+        if result.answerable:
+            print(
+                f"  {result.question_id:<12} recall {_percent(result.recall)}  "
+                f"precision {_percent(result.precision)}  "
+                f"first relevant rank {result.first_relevant_rank or '-'}  "
+                f"ndcg {_percent(result.ndcg)}"
+            )
+        else:
+            print(
+                f"  {result.question_id:<12} no answer expected, "
+                f"top score {_percent(result.top_score)}"
+            )
+    summary = report.summary
+    print("\nBy group:")
+    for name, metrics in summary["groups"].items():
+        _print_metrics(name, metrics)
+    if summary["overall"]:
+        print("Overall:")
+        _print_metrics("all", summary["overall"])
+    print(
+        f"Mean top score: answerable {_percent(summary['mean_top_score_answerable'])},"
+        f" no-answer {_percent(summary['mean_top_score_no_answer'])}."
+    )
+    print(f"Saved evaluation {evaluation_id}.")
+    return 0
+
+
 def _not_implemented(args: argparse.Namespace) -> int:
     if hasattr(args, "setup"):
         get_setup(args.setup)
@@ -231,6 +312,14 @@ def build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--setup", required=True)
     query_parser.add_argument("--top-k", type=int, default=5)
     query_parser.set_defaults(handler=_query)
+
+    evaluate_parser = commands.add_parser(
+        "evaluate", help="Evaluate retrieval against labelled questions."
+    )
+    evaluate_parser.add_argument("--setup", required=True)
+    evaluate_parser.add_argument("--questions", required=True)
+    evaluate_parser.add_argument("--top-k", type=int, default=5)
+    evaluate_parser.set_defaults(handler=_evaluate)
 
     status_parser = commands.add_parser("status", help="Show index status.")
     status_parser.set_defaults(handler=_not_implemented)

@@ -11,7 +11,9 @@ may change as experiments produce evidence.
 - [RAG strategy working draft](rag-strategy.md) — provisional experiment and
   Qdrant-collection management direction for this project.
 - [Architecture](architecture.md) — indexing and query flow.
-- [CLI](cli.md) — initial commands for predefined RAG setups.
+- [CLI](cli.md) — commands for predefined RAG setups.
+- [Evaluation](evaluation.md) — how retrieval is scored and how to read the
+  scores.
 - [Implementation plan](plan.md) — short milestone sequence.
 - [SQL schema analysis](sql-schema-analysis.md) — current tables, useful
   relationships, gaps, and a migration path for RAG experiments.

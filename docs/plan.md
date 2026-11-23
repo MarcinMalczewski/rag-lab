@@ -22,7 +22,10 @@
    3. [ ] End-to-end ingest with a real Ollama model (needs Ollama installed).
 7. [x] Implement setup-scoped query and dense retrieval, fetching canonical
    passage text and metadata from PostgreSQL by the returned IDs.
-8. Add retrieval evaluation using dataset relevance labels.
+8. Add retrieval evaluation using dataset relevance labels:
+   1. [x] Evaluator, `raglab evaluate`, and saved results
+      (`data/sample/questions.jsonl` labels with answer spans).
+   2. [ ] First evaluation run with a real embedding model (needs step 6.3).
 9. Compare chunking profiles and record experiment results.
 10. Add hybrid retrieval, reranking, and late chunking as separate experiments.
 

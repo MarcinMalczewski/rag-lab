@@ -12,6 +12,7 @@ from rag_lab.templates import source_checksum
 from rag_lab.vector_store import QdrantIndex
 
 SAMPLE = str(Path(__file__).parents[1] / "data" / "sample" / "documents.jsonl")
+QUESTIONS = str(Path(__file__).parents[1] / "data" / "sample" / "questions.jsonl")
 
 
 @pytest.mark.parametrize(
@@ -24,6 +25,7 @@ SAMPLE = str(Path(__file__).parents[1] / "data" / "sample" / "documents.jsonl")
             [SAMPLE, "--template", "jsonl-documents", "--setup", "nomic-naive-100-0"],
         ),
         ("query", ["What is RAG?", "--setup", "nomic-naive-100-0"]),
+        ("evaluate", ["--setup", "nomic-naive-100-0", "--questions", "q.jsonl"]),
         ("status", []),
         ("reset", ["--setup", "nomic-naive-100-0", "--yes"]),
     ],
@@ -156,4 +158,47 @@ def test_query_reports_setup_without_complete_run(
     monkeypatch.setattr("rag_lab.cli.get_embedder", lambda *_: FakeEmbedder(384))
 
     assert main(["query", "anything", "--setup", "minilm-naive-500-100"]) == 1
+    assert "no complete run" in capsys.readouterr().out  # type: ignore[attr-defined]
+
+
+def test_evaluate_runs_and_saves_results(
+    postgres_settings: None,
+    qdrant_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: object,
+) -> None:
+    monkeypatch.setattr("rag_lab.cli.get_embedder", lambda *_: FakeEmbedder(768))
+    ingest = ["ingest", SAMPLE, "--template", "jsonl-documents", "--setup"]
+    assert main([*ingest, "nomic-naive-100-0"]) == 0
+    capsys.readouterr()  # type: ignore[attr-defined]
+
+    status = main(
+        ["evaluate", "--setup", "nomic-naive-100-0", "--questions", QUESTIONS]
+    )
+
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert status == 0
+    assert "sample-A1" in output and "no answer expected" in output
+    assert "By group:" in output and "Saved evaluation" in output
+    settings = get_settings()
+    with ProvenanceStore(settings.postgres_dsn, settings.provenance_schema) as store:
+        run = store.latest_complete_run("nomic-naive-100-0")
+        assert run is not None
+        (saved, *_) = store.load_evaluations(run[0])
+    assert len(saved["details"]) == 25
+
+
+def test_evaluate_reports_setup_without_complete_run(
+    postgres_settings: None,
+    qdrant_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: object,
+) -> None:
+    monkeypatch.setattr("rag_lab.cli.get_embedder", lambda *_: FakeEmbedder(384))
+
+    status = main(
+        ["evaluate", "--setup", "minilm-naive-500-100", "--questions", QUESTIONS]
+    )
+
+    assert status == 1
     assert "no complete run" in capsys.readouterr().out  # type: ignore[attr-defined]
