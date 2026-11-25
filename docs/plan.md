@@ -6,8 +6,9 @@
 3. Implement ingestion templates:
    1. [x] Template registry and normalized `Document` model.
    2. [x] `jsonl-documents` template (manual data, `data/sample/`).
-   3. [ ] MS MARCO template.
-   4. [ ] SQuAD template.
+   3. [x] `parquet-documents` template (local parquet or `http`/`https` URL; columns `_id`, `text`, `title`).
+   4. [ ] MS MARCO template.
+   5. [ ] SQuAD template.
 4. Add normalized document storage and deterministic chunk identities:
    1. [x] Store normalized documents in PostgreSQL, keyed by corpus version
       (source checksum).
@@ -22,6 +23,10 @@
    3. [ ] End-to-end ingest with a real Ollama model (needs Ollama installed).
 7. [x] Implement setup-scoped query and dense retrieval, fetching canonical
    passage text and metadata from PostgreSQL by the returned IDs.
+   1. [ ] Select an earlier complete run: `raglab runs --setup` and
+      `raglab query --run`. Store the ingest source on the run. The corpus
+      checksum alone is not a usable name, so a previous corpus cannot be
+      queried after a newer ingest of the same setup.
 8. Add retrieval evaluation using dataset relevance labels:
    1. [x] Evaluator, `raglab evaluate`, and saved results
       (`data/sample/questions.jsonl` labels with answer spans).

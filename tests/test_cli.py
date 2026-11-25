@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import pytest
@@ -49,7 +49,68 @@ def test_setups_command_lists_predefined_setups(capsys: object) -> None:
 
 def test_templates_command_lists_templates(capsys: object) -> None:
     assert main(["templates"]) == 0
-    assert "jsonl-documents" in capsys.readouterr().out  # type: ignore[attr-defined]
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert "jsonl-documents" in output
+    assert "parquet-documents" in output
+
+
+def test_ingest_parquet_url_uses_cache(
+    postgres_settings: None,
+    qdrant_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: object,
+) -> None:
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    path = tmp_path / "corpus.parquet"
+    pq.write_table(
+        pa.Table.from_pylist(
+            [{"_id": "doc-1", "text": "alpha beta", "title": "Alpha"}]
+        ),
+        path,
+    )
+    seen: dict[str, object] = {}
+
+    def fake_resolve(source: str, **kwargs: object) -> Path:
+        seen["source"] = source
+        seen["max_age_days"] = kwargs["max_age_days"]
+        return path
+
+    monkeypatch.setattr("rag_lab.cli.resolve_source", fake_resolve)
+    monkeypatch.setattr("rag_lab.cli.get_embedder", lambda *_: FakeEmbedder(768))
+    url = "https://example.test/corpus.parquet"
+
+    assert (
+        main(
+            [
+                "ingest",
+                url,
+                "--template",
+                "parquet-documents",
+                "--setup",
+                "nomic-naive-100-0",
+            ]
+        )
+        == 0
+    )
+    output = capsys.readouterr().out  # type: ignore[attr-defined]
+    assert url in output
+    assert str(path) in output
+    assert seen["source"] == url
+    assert seen["max_age_days"] == get_settings().cache_max_age_days
+    settings = get_settings()
+    with ProvenanceStore(settings.postgres_dsn, settings.provenance_schema) as store:
+        documents = store.load_documents(source_checksum(path))
+        refs = store.vector_refs("nomic-naive-100-0")
+    assert [(document.document_id, document.title) for document in documents] == [
+        ("doc-1", "Alpha")
+    ]
+    index = QdrantIndex(qdrant_url)
+    assert index.count("nomic-embed-text-768", setup_id="nomic-naive-100-0") == len(
+        refs
+    )
 
 
 def test_ingest_stores_chunks_and_indexes_vectors(
@@ -88,7 +149,12 @@ def test_ingest_reports_embedding_failure(
     capsys: object,
 ) -> None:
     class Failing:
-        def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        def embed(
+            self,
+            texts: Sequence[str],
+            *,
+            on_progress: Callable[[int, int], None] | None = None,
+        ) -> list[list[float]]:
             raise EmbeddingError("model missing")
 
     monkeypatch.setattr("rag_lab.cli.get_embedder", lambda *_: Failing())

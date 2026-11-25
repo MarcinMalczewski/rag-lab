@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     model_request_timeout_seconds: float = 60.0
     model_max_retries: int = 2
     ollama_url: str = "http://localhost:11434"
+    cache_max_age_days: int = 30
 
     @property
     def postgres_dsn(self) -> str:

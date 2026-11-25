@@ -36,6 +36,23 @@ def test_embeds_in_batches_and_preserves_order() -> None:
     assert vectors == [[float(i)] for i in range(70)]
 
 
+def test_reports_progress_after_each_batch() -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        texts = json.loads(request.content)["input"]
+        return httpx.Response(200, json={"embeddings": [[1.0] for _ in texts]})
+
+    seen: list[tuple[int, int]] = []
+
+    def record(done: int, total: int) -> None:
+        seen.append((done, total))
+
+    embedder(httpx.MockTransport(handle), batch_size=2).embed(
+        ["a", "b", "c", "d", "e"], on_progress=record
+    )
+
+    assert seen == [(2, 5), (4, 5), (5, 5)]
+
+
 def test_retries_then_succeeds() -> None:
     calls: list[int] = []
 

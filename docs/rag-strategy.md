@@ -30,6 +30,7 @@ Initial template IDs should include:
 | `squad-contexts` | SQuAD JSON | Index unique contexts; retain questions and answer spans as evaluation data. |
 | `markdown-directory` | Manually maintained Markdown files | Use file path/front matter as source metadata. |
 | `jsonl-documents` | One document per JSONL row | Map configured ID, text, title, and metadata fields. |
+| `parquet-documents` | One document per parquet row, local file or `http`/`https` URL | Map `_id`, `text`, and `title`. Other columns are ignored. |
 
 The ingestion run must record the template ID, source location, source checksum
 or dataset release, and normalized corpus version. This keeps comparisons fair:

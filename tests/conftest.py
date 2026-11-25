@@ -1,6 +1,6 @@
 import random
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 
 import pytest
 from testcontainers.community.postgres import PostgresContainer
@@ -56,9 +56,21 @@ class FakeEmbedder:
     def __init__(self, dimensions: int = 8) -> None:
         self.dimensions = dimensions
 
-    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+    def embed(
+        self,
+        texts: Sequence[str],
+        *,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[list[float]]:
+        """Return one stable vector per text.
+
+        >>> len(FakeEmbedder(2).embed(["a"])[0])
+        2
+        """
         vectors = []
         for text in texts:
             rng = random.Random(text)
             vectors.append([rng.random() for _ in range(self.dimensions)])
+        if on_progress is not None:
+            on_progress(len(texts), len(texts))
         return vectors

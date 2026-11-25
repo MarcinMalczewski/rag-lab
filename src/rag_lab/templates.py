@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
+import pyarrow.parquet as pq
+
 from rag_lab.documents import Document
 
 
@@ -81,8 +83,71 @@ class JsonlDocumentsTemplate:
         return value
 
 
+@dataclass(frozen=True)
+class ParquetDocumentsTemplate:
+    """One document per parquet row, with configurable column names."""
+
+    id: str = "parquet-documents"
+    description: str = "One document per parquet row (_id, text, title)."
+    id_field: str = "_id"
+    text_field: str = "text"
+    title_field: str = "title"
+
+    def load(self, source: Path) -> list[Document]:
+        """Load one document per row from a parquet file.
+
+        Expects ``id_field``, ``text_field``, and ``title_field``. Other columns
+        are ignored. A null or blank title is stored as None. Raises ValueError
+        for a missing column, a blank or non-string id or text, a non-string
+        title, a duplicate id, or a table with no rows. Row numbers start at 1.
+
+        >>> ParquetDocumentsTemplate().title_field
+        'title'
+        """
+        table = pq.read_table(source)
+        columns = set(table.column_names)
+        for name in (self.id_field, self.text_field, self.title_field):
+            if name not in columns:
+                raise ValueError(f"{source}: missing column '{name}'")
+        rows = table.select(
+            [self.id_field, self.text_field, self.title_field]
+        ).to_pylist()
+        documents: list[Document] = []
+        seen: set[str] = set()
+        for number, row in enumerate(rows, start=1):
+            location = f"{source}:{number}"
+            document_id = JsonlDocumentsTemplate._required_text(
+                row, self.id_field, location
+            )
+            text = JsonlDocumentsTemplate._required_text(row, self.text_field, location)
+            title = self._title(row, location)
+            if document_id in seen:
+                raise ValueError(f"{location}: duplicate id '{document_id}'")
+            seen.add(document_id)
+            documents.append(Document(document_id, text, title, {}))
+        if not documents:
+            raise ValueError(f"{source}: no documents found")
+        return documents
+
+    def _title(self, row: dict[str, Any], location: str) -> str | None:
+        """Return the title, or None when it is null or blank.
+
+        >>> ParquetDocumentsTemplate()._title({"title": "  "}, "row") is None
+        True
+        """
+        value = row.get(self.title_field)
+        if value is None:
+            return None
+        if not isinstance(value, str):
+            raise ValueError(f"{location}: '{self.title_field}' must be a string")
+        if not value.strip():
+            return None
+        return value
+
+
 TEMPLATES: dict[str, IngestionTemplate] = {
-    template.id: template for template in (JsonlDocumentsTemplate(),)
+    template.id: template
+    for template in (JsonlDocumentsTemplate(), ParquetDocumentsTemplate())
 }
 
 

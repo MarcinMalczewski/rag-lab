@@ -35,6 +35,12 @@ Qdrant holds vectors and retrieval payloads. The provenance store records
 documents, setup definitions, runs, and evaluation results so experiments remain
 reproducible.
 
+A query uses the setup's newest complete run. Points from an earlier ingest of
+the same setup stay in the collection and are left out by the `run_id` filter.
+There is no way to select that earlier run yet. A run stores the corpus
+checksum, not the source path or URL, so the checksum is the only name the
+older corpus has.
+
 ## Components
 
 | Component | Role |
