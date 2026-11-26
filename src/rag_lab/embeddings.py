@@ -1,7 +1,7 @@
 """Embedding providers."""
 
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -18,7 +18,18 @@ class EmbeddingError(RuntimeError):
 class Embedder(Protocol):
     """Turns texts into vectors, one vector per text, in order."""
 
-    def embed(self, texts: Sequence[str]) -> list[list[float]]: ...
+    def embed(
+        self,
+        texts: Sequence[str],
+        *,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[list[float]]:
+        """Return one vector per text, in order.
+
+        When on_progress is set, call on_progress(done, total) after each
+        successful batch. done is how many texts are finished.
+        """
+        ...
 
 
 @dataclass(frozen=True)
@@ -33,17 +44,33 @@ class OllamaEmbedder:
     retry_delay_seconds: float = 0.5
     transport: httpx.BaseTransport | None = None
 
-    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+    def embed(
+        self,
+        texts: Sequence[str],
+        *,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[list[float]]:
+        """Return one vector per text, in order.
+
+        When on_progress is set, it is called as on_progress(done, total) after
+        each successful batch. A failed batch is not reported. An empty input
+        makes no requests.
+
+        >>> OllamaEmbedder("http://localhost:11434", "m").embed([])
+        []
+        """
         vectors: list[list[float]] = []
+        total = len(texts)
         with httpx.Client(
             base_url=self.base_url,
             timeout=self.timeout_seconds,
             transport=self.transport,
         ) as client:
-            for start in range(0, len(texts), self.batch_size):
-                vectors.extend(
-                    self._embed_batch(client, texts[start : start + self.batch_size])
-                )
+            for start in range(0, total, self.batch_size):
+                batch = texts[start : start + self.batch_size]
+                vectors.extend(self._embed_batch(client, batch))
+                if on_progress is not None:
+                    on_progress(len(vectors), total)
         return vectors
 
     def _embed_batch(
@@ -91,7 +118,17 @@ class HuggingFaceEmbedder:
     device: str = "cpu"
     trust_remote_code: bool = False
 
-    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+    def embed(
+        self,
+        texts: Sequence[str],
+        *,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> list[list[float]]:
+        """Return one vector per text, in order.
+
+        When on_progress is set, it is called as on_progress(done, total) after
+        each successful batch.
+        """
         try:
             import torch
             import torch.nn.functional as functional
@@ -120,6 +157,8 @@ class HuggingFaceEmbedder:
                 mask = batch["attention_mask"].unsqueeze(-1).to(hidden.dtype)
                 pooled = (hidden * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1e-9)
                 vectors.extend(functional.normalize(pooled, dim=1).tolist())
+                if on_progress is not None:
+                    on_progress(len(vectors), len(texts))
         return vectors
 
 

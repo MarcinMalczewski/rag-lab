@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start Qdrant and PostgreSQL in the background.
+# Start Qdrant, PostgreSQL, and Adminer in the background.
 set -euo pipefail
 
 cd "$(dirname "$0")"

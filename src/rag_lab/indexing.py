@@ -1,5 +1,6 @@
 """Embed chunks and write them to Qdrant."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -46,11 +47,16 @@ def index_chunks(
     corpus_version: str,
     embedder: Embedder,
     index: QdrantIndex,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> IndexResult:
-    """Embed and upsert chunks, then verify the stored point count for the run."""
+    """Embed and upsert chunks, then verify the stored point count for the run.
+
+    When on_progress is set, it is called as on_progress(done, total) after
+    each embedding batch.
+    """
     if not chunks:
         raise ValueError("No chunks to index.")
-    vectors = embedder.embed([chunk.text for chunk in chunks])
+    vectors = embedder.embed([chunk.text for chunk in chunks], on_progress=on_progress)
     dimensions = len(vectors[0])
     if any(len(vector) != dimensions for vector in vectors):
         raise ValueError("Embedder returned vectors of different lengths.")

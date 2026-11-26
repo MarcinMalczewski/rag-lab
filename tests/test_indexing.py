@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import pytest
 
@@ -59,7 +59,12 @@ def test_dimension_mismatch_with_profile_is_rejected(qdrant_url: str) -> None:
 
 def test_inconsistent_vector_lengths_are_rejected(qdrant_url: str) -> None:
     class Uneven:
-        def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        def embed(
+            self,
+            texts: Sequence[str],
+            *,
+            on_progress: Callable[[int, int], None] | None = None,
+        ) -> list[list[float]]:
             return [[1.0] * (i + 1) for i, _ in enumerate(texts)]
 
     with pytest.raises(ValueError, match="different lengths"):

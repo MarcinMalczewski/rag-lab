@@ -16,6 +16,7 @@ from rag_lab.provenance import ProvenanceStore
 from rag_lab.retrieval import search_setup
 from rag_lab.settings import Settings, get_settings
 from rag_lab.setups import Setup, get_setup, list_setups
+from rag_lab.sources import resolve_source
 from rag_lab.templates import get_template, list_templates, source_checksum
 from rag_lab.vector_store import QdrantIndex
 
@@ -41,7 +42,6 @@ def _chunk_all(documents: list[Document], setup: Setup) -> dict[str, list[Chunk]
 def _ingest(args: argparse.Namespace) -> int:
     setup = get_setup(args.setup)
     template = get_template(args.template)
-    source = Path(args.source)
     chunking = setup.chunking
     print(
         f"Setup:    {setup.id} ({chunking.strategy}, "
@@ -51,7 +51,16 @@ def _ingest(args: argparse.Namespace) -> int:
         f"{setup.retrieval_mode})"
     )
     print(f"Template: {template.id}")
-    print(f"Source:   {source}")
+    print(f"Source:   {args.source}")
+    settings = get_settings()
+    source = resolve_source(
+        args.source,
+        max_age_days=settings.cache_max_age_days,
+        max_retries=settings.model_max_retries,
+        timeout_seconds=settings.model_request_timeout_seconds,
+    )
+    if source != Path(args.source):
+        print(f"Cached:   {source}")
 
     documents = template.load(source)
     chunks_by_document: dict[str, list[Chunk]] | None
@@ -85,7 +94,6 @@ def _ingest(args: argparse.Namespace) -> int:
     else:
         print(chunk_note)
 
-    settings = get_settings()
     print(
         f"Connecting to PostgreSQL {settings.postgres_host}:{settings.postgres_port}"
         f"/{settings.postgres_db} (schema {settings.provenance_schema})..."
@@ -136,6 +144,10 @@ def _index(
         f"Embedding {len(chunks)} chunks with {profile.provider}/{profile.model} "
         f"(batch size {settings.embedding_batch_size})..."
     )
+
+    def _report(done: int, total: int) -> None:
+        print(f"Embedded {done}/{total} chunks", flush=True)
+
     index = QdrantIndex(settings.qdrant_url, settings.qdrant_api_key)
     try:
         result = index_chunks(
@@ -145,6 +157,7 @@ def _index(
             corpus_version,
             embedder,
             index,
+            on_progress=_report,
         )
     finally:
         index.close()
